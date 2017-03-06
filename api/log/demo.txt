@@ -1,0 +1,1 @@
+This file is added so that the clone of this repo should have log directory

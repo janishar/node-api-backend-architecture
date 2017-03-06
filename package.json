@@ -1,0 +1,22 @@
+{
+  "name": "api-backend",
+  "version": "1.0.0",
+  "private": true,
+  "scripts": {
+    "start": "node ./server.js"
+  },
+  "dependencies": {
+    "bluebird": "^3.4.7",
+    "body-parser": "~1.15.2",
+    "cookie-parser": "~1.4.3",
+    "express": "~4.14.0",
+    "express-validator": "^3.1.2",
+    "jsonwebtoken": "^7.1.7",
+    "morgan": "~1.7.0",
+    "mysql": "^2.11.1",
+    "promise": "^7.1.1",
+    "serve-favicon": "~2.3.0",
+    "validator": "^6.2.0",
+    "vhost": "^3.0.2"
+  }
+}
