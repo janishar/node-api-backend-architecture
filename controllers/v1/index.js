@@ -23,8 +23,6 @@ const app = express();
 
 const fileLog = new (require('./../../helpers/file_log'))();
 
-app.use('/v1/blogs', require('./blogs'));
-
 /**
  *******************************************************************************************
  * Intercepts all the /v1/* calls and marks it's API version

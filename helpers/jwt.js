@@ -26,7 +26,7 @@ const jsonWebToken = Promise.promisifyAll(require('jsonwebtoken'));
 let InternalError = require('./error').InternalError;
 let InvalidJwtTokenError = require('./error').InvalidJwtTokenError;
 
-const debug = new (require('./../helpers/debug'))();
+const debug = new (require('./debug'))();
 
 class JWT {
 
@@ -59,7 +59,7 @@ class JWT {
     }
 
     static readAuthKey() {
-        return fs.readFileAsync(path.join(__dirname, './../../authkey.pem'))
+        return fs.readFileAsync(path.join(__dirname, './../authkey.pem'))
     }
 
     encode() {

@@ -65,6 +65,5 @@ else {
 }
 
 app.set('port', process.env.PORT || config.port);
-app.use(vhost('www.yourdomain.com', require('./www/routes.js')));
-app.use(vhost(config.api_sub_domain + '.yourdomain.com', require('./api/routes.js')));
+app.use(require('./routes.js'));
 http.listen(app.get('port'));

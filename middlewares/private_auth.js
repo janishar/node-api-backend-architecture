@@ -18,12 +18,12 @@
  */
 'use strict';
 
-const config = require('./../../config');
+const config = require('./../config');
 const express = require('express');
 const router = express.Router();
 
 let JWT = require('./../helpers/jwt');
-let UserAccess = require('../models/user_access');
+let UserAccess = require('./../models/user_access');
 let AccessTokenErrorResponse = require('./../helpers/response').AccessTokenErrorResponse;
 let BadRequestResponse = require('./../helpers/response').BadRequestResponse;
 let ForbiddenError = require('./../helpers/error').ForbiddenError;
