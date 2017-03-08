@@ -23,6 +23,8 @@ const app = express();
 
 const fileLog = new (require('./../../helpers/file_log'))();
 
+app.use('/v1/blogs', require('./blogs'));
+
 /**
  *******************************************************************************************
  * Intercepts all the /v1/* calls and marks it's API version
@@ -50,7 +52,7 @@ app.use('/v1', (req, res, next) => {
     next();
 });
 app.use('/v1', require('./../../middlewares/private_auth'));
-//app.use('/v1/logout', require('./logout'));
+//app.use('/v1/blogs', require('./blogs'));
 //..............................................................................................
 //**********************************************************************************************
 
