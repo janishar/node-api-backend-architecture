@@ -52,9 +52,7 @@ class Query {
     }
 
     execute() {
-
         return Promise.using(Query.getSqlConnection(), connection => {
-
             return connection.queryAsync(this._queryString, this._queryData)
                 .catch(e => {
                     debug.logAsJSON(e);
@@ -78,11 +76,8 @@ class Query {
     };
 
     static transaction(fn) {
-
         return Promise.using(DB_POOL.getConnectionAsync(), connection => {
-
-            var tx = connection.beginTransactionAsync();
-
+            let tx = connection.beginTransactionAsync();
             return fn(connection)
                 .then(
                     res => {
@@ -136,20 +131,28 @@ class QueryBuilder {
         this.queryData = queryData;
     }
 
-    select(columnNameArray) {
+    select(queryMap) {
 
         this._queryString = 'SELECT ';
 
-        if (columnNameArray === undefined || columnNameArray === null || !columnNameArray.isArray) {
+        if (queryMap === undefined
+            || queryMap === null
+            || !(queryMap instanceof QueryMap)) {
+
             this._queryString += '* ';
         }
         else {
 
-            for (let i = 0; i < columnNameArray.length; i++) {
+            let count = 0;
 
-                this._queryString += columnNameArray[i];
+            for (var [key, value] of queryMap.entries()) {
 
-                if (i < columnNameArray.length - 1) {
+                count++;
+
+                this._queryString += key;
+                this.values(value);
+
+                if (count < queryMap.size()) {
                     this._queryString += ', ';
                 }
             }
@@ -182,10 +185,53 @@ class QueryBuilder {
         return this
     }
 
-    whereMap(map) {
-        if (map !== undefined && map !== null) {
-            for (var [key, value] of map.entries()) {
-                this.where(key, value);
+    whereId(id) {
+
+        this._queryString += 'WHERE ';
+        this._queryString += 'id = ? ';
+        this.values(id);
+        return this
+    }
+
+    whereAndQueryMap(queryMap) {
+        if (queryMap !== undefined
+            && queryMap !== null
+            && queryMap instanceof QueryMap) {
+
+            let isWhereWritten = false;
+
+            for (var [key, value] of queryMap.entries()) {
+
+                if (!isWhereWritten) {
+
+                    this.where(key, value);
+
+                    isWhereWritten = true;
+                } else {
+                    this.and(key, value)
+                }
+            }
+        }
+        return this
+    }
+
+    whereOrQueryMap(queryMap) {
+        if (queryMap !== undefined
+            && queryMap !== null
+            && queryMap instanceof QueryMap) {
+
+            let isWhereWritten = false;
+
+            for (var [key, value] of queryMap.entries()) {
+
+                if (!isWhereWritten) {
+
+                    this.where(key, value);
+
+                    isWhereWritten = true;
+                } else {
+                    this.or(key, value)
+                }
             }
         }
         return this
@@ -240,5 +286,58 @@ class QueryBuilder {
     }
 }
 
+class QueryMap{
+
+    constructor(){
+        this.map = new Map();
+    }
+
+    get _map(){
+        return this.map;
+    }
+
+    set _map(map){
+        return this.map = map;
+    }
+
+    put(key, value){
+        this.map.set(key, value);
+        return this;
+    }
+
+    get(key){
+        return this._map.get(key);
+    }
+
+    contains(key){
+        return this._map.has(key);
+    }
+
+    remove(key){
+        return this._map.delete(key);
+    }
+
+    clear(){
+        return this._map.clear();
+    }
+
+    values(){
+        return this._map.values();
+    }
+
+    keys(){
+        return this._map.keys();
+    }
+
+    size(){
+        return this._map.size();
+    }
+
+    entries(){
+        return this._map.entries();
+    }
+}
+
 module.exports = Query;
 module.exports.QueryBuilder = QueryBuilder;
+module.exports.QueryMap = QueryMap;

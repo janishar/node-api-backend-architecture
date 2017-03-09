@@ -3,11 +3,12 @@
  */
 
 const Model = require('./model');
-const debug = new (require('./../helpers/debug'))();
-
+const Query = require('./../helpers/query');
+const QueryMap = require('./../helpers/query').QueryMap;
 class Feedback extends Model {
 
     constructor(userId, message, creationMode, providedAt) {
+
         super('feedbacks');
 
         this._userId = userId;
@@ -29,30 +30,25 @@ class Feedback extends Model {
     }
 
     getOne(id){
+        return super.getOne(new QueryMap().put('id', id), this)
+    }
 
-        this._id = id;
-
-        let queryConditionMap = new Map();
-        queryConditionMap.set('id', this._id);
-        return super.getOne(queryConditionMap, this)
+    getAll() {
+        return super.getAll(new QueryMap().put('status', 1));
     }
 
     update() {
-        let queryConditionMap = new Map();
-        queryConditionMap.set('id', this._id);
-        return super.update(queryConditionMap);
+        return super.update(new QueryMap().put('id', this._id))
     }
 
     remove() {
-        let queryConditionMap = new Map();
-        queryConditionMap.set('id', this._id);
-        return super.update(queryConditionMap);
+        return super.remove(new QueryMap().put('id', this._id))
     }
 
     updateInTx() {
-        let queryConditionMap = new Map();
-        queryConditionMap.set('id', this._id);
-        return super.update(queryConditionMap);
+        return Query.transaction(connection => {
+            return super.updateInTx(connection, new QueryMap().put('id', this._id))
+        })
     }
 
     get _userId() {

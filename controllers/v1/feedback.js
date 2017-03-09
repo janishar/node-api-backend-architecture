@@ -1,3 +1,4 @@
+const Promise = require('bluebird');
 const express = require('express');
 const router = express.Router();
 
@@ -24,7 +25,7 @@ router.post('/',
             req.body.provided_at
         ).create()
             .then(feedback => {
-                return new SuccessResponse("Feedback received successfully.", feedback).send(res);
+                return new SuccessResponse("Feedback received successfully.", feedback.getValues()).send(res);
             })
             .catch(err => next(err))
     });
@@ -55,7 +56,7 @@ router.put('/:id',
                 return feedback.update();
             })
             .then(feedback => {
-                return new SuccessResponse("Feedback received successfully.", feedback).send(res);
+                return new SuccessResponse("Feedback received successfully.", feedback.getValues()).send(res);
             })
             .catch(err => next(err))
     });
@@ -65,7 +66,18 @@ router.get('/all',
 
         return new Feedback().getAll()
             .then(feedbackList => {
-                return new SuccessResponse("success.", feedbackList).send(res);
+
+                let data = [];
+                feedbackList.forEach( feedback => {
+                    data.push(feedback.getValues());
+                });
+
+                return Promise.map(feedbackList, feedback => {
+                    return feedback.getValues();
+                });
+            })
+            .then(data => {
+                return new SuccessResponse("success.", data).send(res);
             })
             .catch(err => next(err))
     });

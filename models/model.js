@@ -60,33 +60,71 @@ class Model {
     }
 
     create() {
+
+        this._createdAt = new Timestamp().getYMDHMS();
+        this._updatedAt = this._createdAt;
+
         return Query.builder(this._tableName)
             .insert()
             .values(this.getValues())
             .build()
             .execute()
             .then(result => {
-                return new Promise((resolve, reject) => {
-
-                    if (result.insertId === undefined || result.insertId === null) {
-                        return reject(new InternalError());
-                    }
-
-                    this._id = result.insertId;
-
-                    return resolve(this)
-                })
+                return this.parseCreateResult(result);
             })
     }
 
-    update(queryConditionMap) {
+    update(whereAndQueryMap) {
+
+        this._updatedAt = new Timestamp().getYMDHMS();
 
         return Query.builder(this._tableName)
             .update()
             .values(this.getValues())
-            .whereMap(queryConditionMap)
+            .whereAndQueryMap(whereAndQueryMap)
             .build()
             .execute()
+            .then(result => {
+                return this.parseUpdateResult(result);
+            })
+    }
+
+    remove(whereAndQueryMap) {
+        return Query.builder(this._tableName)
+            .remove()
+            .whereAndQueryMap(whereAndQueryMap)
+            .build()
+            .execute()
+            .then(result => {
+                return this.parseRemoveResult();
+            })
+    }
+
+    createInTx(connection) {
+
+        this._createdAt = new Timestamp().getYMDHMS();
+        this._updatedAt = this._createdAt;
+
+        return Query.builder(this._tableName)
+            .insert()
+            .values(this.getValues())
+            .build()
+            .executeInTx(connection)
+            .then(result => {
+                return this.parseCreateResult(result);
+            })
+    }
+
+    updateInTx(connection, whereAndQueryMap) {
+
+        this._updatedAt = new Timestamp().getYMDHMS();
+
+        return Query.builder(this._tableName)
+            .update()
+            .values(this.getValues())
+            .whereAndQueryMap(whereAndQueryMap)
+            .build()
+            .executeInTx(connection)
             .then(result => {
                 return new Promise((resolve, reject) => {
 
@@ -99,109 +137,27 @@ class Model {
             })
     }
 
-    remove(queryConditionMap) {
-
-        return Query.builder(this._tableName)
-            .whereMap(queryConditionMap)
-            .build()
-            .execute()
-            .then(result => {
-                return new Promise((resolve, reject) => {
-
-                    if (!(result.affectedRows > 0)) {
-                        return reject(new InternalError());
-                    }
-
-                    return resolve(true)
-                })
-            })
-    }
-
-    createInTx() {
-        return Query.transaction(connection => {
-
-            return Query.builder(this._tableName)
-                .insert()
-                .values(this.getValues())
-                .build()
-                .executeInTx(connection)
-                .then(result => {
-                    return new Promise((resolve, reject) => {
-
-                        if (result.insertId === undefined) {
-                            return reject(new InternalError());
-                        }
-
-                        this._id = result.insertId;
-
-                        resolve(this)
-                    });
-                })
-        })
-    }
-
-    updateInTx(queryConditionMap) {
-        return Query.transaction(connection => {
-            return Query.builder(this._tableName)
-                .update()
-                .whereMap(queryConditionMap)
-                .values(this.getValues())
-                .build()
-                .executeInTx(connection)
-                .then(result => {
-                    return new Promise((resolve, reject) => {
-
-                        if (!(result.affectedRows > 0)) {
-                            return reject(new InternalError());
-                        }
-
-                        return resolve(this)
-                    })
-                })
-        })
-    }
-
-    getOne(queryConditionMap) {
-
+    getOne(whereAndQueryMap) {
         return Query.builder(this._tableName)
             .select()
-            .whereMap(queryConditionMap)
+            .whereAndQueryMap(whereAndQueryMap)
             .limit(1)
             .build()
             .execute()
             .then(results => {
-                return new Promise((resolve, reject) => {
-
-                    if (results[0] === undefined) {
-                        return reject(new NoSuchEntityExistsError('No Such Entry'));
-                    }
-
-                    return resolve(this.copy(results[0]))
-                })
+                return this.parseGetResultsForOne(results)
             })
     }
 
-    getAll(queryConditionMap) {
+    getAll(whereAndQueryMap) {
 
         return Query.builder(this._tableName)
             .select()
-            .whereMap(queryConditionMap)
+            .whereAndQueryMap(whereAndQueryMap)
             .build()
             .execute()
             .then(results => {
-                return new Promise((resolve, reject) => {
-                    if (results[0] === undefined) {
-                        return reject(new NoSuchEntityExistsError(errMsg));
-                    }
-
-                    let array = [];
-
-                    for (let i = 0; i < results.length; i++) {
-                        array.push(new this.constructor().copy(results[i]))
-                    }
-
-                    return resolve(array)
-                })
+                return this.parseGetResults(results);
             })
     }
 
@@ -210,46 +166,80 @@ class Model {
      *  it specifies the rows to fetch after x rows
      *  count specifies the number of rows to fetch from the offset
      */
-    getAsPaginated(offset, count, queryConditionMap) {
+    getAsPaginated(offset, count, whereAndQueryMap) {
 
         return Query.builder(this._tableName)
             .select()
-            .whereMap(queryConditionMap)
+            .whereAndQueryMap(whereAndQueryMap)
             .limit(count, offset)
             .build()
             .execute()
             .then(results => {
-                return new Promise((resolve, reject) => {
-                    if (results[0] === undefined) {
-                        return reject(new NoSuchEntityExistsError(errMsg));
-                    }
-
-                    let array = [];
-
-                    for (let i = 0; i < results.length; i++) {
-                        array.push(new this.constructor().copy(results[i]))
-                    }
-
-                    return resolve(array)
-                })
+                this.parseGetResults(results)
             })
     }
 
-    batchInsert(sql, values) {
-        return Query.transaction(connection => {
+    parseCreateResult(result){
+        return new Promise((resolve, reject) => {
 
-            return connection.queryAsync(sql, values)
-                .then(result => {
+            if (result.insertId === undefined || result.insertId === null) {
+                return reject(new InternalError());
+            }
 
-                    return new Promise((resolve, reject) => {
-                        if (!(result.affectedRows > 0)) {
-                            return reject(new InternalError());
-                        }
+            this._id = result.insertId;
 
-                        return resolve(true)
-                    })
-                })
-        });
+            return resolve(this)
+        })
+    }
+
+    parseUpdateResult(result){
+        return new Promise((resolve, reject) => {
+
+            if (!(result.affectedRows > 0)) {
+                return reject(new InternalError());
+            }
+
+            return resolve(this)
+        })
+    }
+
+    parseRemoveResult(){
+        return new Promise((resolve, reject) => {
+
+            if (!(result.affectedRows > 0)) {
+                return reject(new InternalError());
+            }
+
+            return resolve(true)
+        })
+    }
+
+    parseGetResults(results){
+        return new Promise((resolve, reject) => {
+            if (results[0] === undefined) {
+                return reject(new NoSuchEntityExistsError());
+            }
+
+            let array = [];
+
+            for (let i = 0; i < results.length; i++) {
+                array.push(new this.constructor().copy(results[i]))
+            }
+
+            debug.logAsJSON('results', results);
+            debug.logAsJSON('array', array);
+
+            return resolve(array)
+        })
+    }
+
+    parseGetResultsForOne(results){
+        return new Promise((resolve, reject) => {
+            if (results[0] === undefined) {
+                return reject(new NoSuchEntityExistsError());
+            }
+            return resolve(new this.constructor().copy(results[0]));
+        })
     }
 
     get _tableName() {
