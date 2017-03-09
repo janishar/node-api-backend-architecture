@@ -7,13 +7,12 @@ const Model = require('./model');
 const UserAccess = require('./user_access');
 const KeyStore = require('./key_store');
 const Timestamp = require('./../helpers/timestamp');
-
-const debug = new (require('../helpers/debug'))();
+const QueryMap = require('./../helpers/query').QueryMap;
 
 class User extends Model {
 
     constructor(email, name) {
-        super();
+        super('users');
         this._email = email;
         this._name = name;
     }
@@ -64,12 +63,10 @@ class User extends Model {
     }
 
     create(accessTokenKey, refreshTokenKey, location) {
-        return Query.executeInTx(connection => {
-            let sql = 'INSERT INTO users SET ? ';
 
-            debug.log(sql);
+        return Query.transaction(connection => {
 
-            return super.createInTx(connection, sql, this)
+            return super.createInTx(connection)
                 .then(user => {
                     let userAccess = new UserAccess(user._id, accessTokenKey, refreshTokenKey, location);
                     return userAccess.createInTx(connection)
@@ -85,20 +82,19 @@ class User extends Model {
                 .then(keystore => {
                     return Promise.resolve(this);
                 })
-        });
+        })
     }
 
     update(accessTokenKey, refreshTokenKey, location) {
+
         this._updatedAt = new Timestamp().getYMDHMS();
 
-        return Query.executeInTx(connection => {
+        return Query.transaction(connection => {
 
-            let sql = 'UPDATE users SET ?  WHERE id = ?';
-
-            return super.updateInTx(connection, sql, [this.clean(), this._id])
+            return super.updateInTx(connection, new QueryMap().put('id', this._id))
                 .then(user => {
                     let userAccess = new UserAccess(user._id, accessTokenKey, refreshTokenKey, location);
-                    return userAccess.updateInTx(connection)
+                    return userAccess.updateInTx(connection, new QueryMap().put('id', this._id))
                 })
                 .then(useraccess => {
                     let keyStore = new KeyStore(
@@ -114,20 +110,20 @@ class User extends Model {
         })
     }
 
-    static getByEmail(email) {
-        let sql = "SELECT * FROM users WHERE email  = ? ";
-        return super.get(sql, email, this, "User not registered");
+    getByEmail(email) {
+        return super.getOne(new QueryMap().put('email', email));
     }
 
-    static getById(userId) {
-        var sql = "SELECT * FROM users WHERE id  = ? ";
-        return super.get(sql, userId, this, "User not registered");
-    }
+    isUserExists(userId) {
 
-    static isUserExists(userId) {
         var sql = "SELECT COUNT(*) AS row_count FROM users WHERE id  = ?";
-        return Query.execute(sql, userId)
-            .then(results => {
+
+        return Query.builder(this._tableName)
+            .rawSQL(sql)
+            .values(userId)
+            .build()
+            .execute()
+            .then(results =>{
                 return new Promise((resolve, reject) => {
                     if (results[0].row_count > 0) {
                         return promise.resolve(true);

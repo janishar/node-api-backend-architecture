@@ -4,13 +4,14 @@
 
 const Promise = require('bluebird');
 const Query = require('./../helpers/query');
+const QueryMap = require('./../helpers/query').QueryMap;
 const Model = require('./model');
 const NoSuchEntityExistsError = require('./../helpers/error').NoSuchEntityExistsError;
 
 class API extends Model {
 
     constructor(apiKey, versionCode) {
-        super();
+        super('apis');
         this._apiKey = apiKey;
         this._versionCode = versionCode;
     }
@@ -43,7 +44,12 @@ class API extends Model {
             + "AND apis.status = 1 "
             + "AND apis.platform_id = t1.id";
 
-        return Query.execute(sql, [this._apiKey, this._versionCode])
+        return Query.builder(this._tableName)
+            .rawSQL(sql)
+            .values(this._apiKey)
+            .values(this._versionCode)
+            .build()
+            .execute()
             .then(results => {
                 return new Promise((resolve, reject) => {
                     if (results[0] === undefined) {

@@ -5,11 +5,13 @@ const Query = require('./../helpers/query');
 const Promise = require('bluebird');
 const Model = require('./model');
 const Timestamp = require('./../helpers/timestamp');
+const KeyStore = require('./key_store');
+const QueryMap = require('./../helpers/query').QueryMap;
 
 class UserAccess extends Model {
 
     constructor(userId, accessToken, refreshToken, location) {
-        super();
+        super('user_access');
         this._userId = userId;
         this._accessToken = accessToken;
         this._refreshToken = refreshToken;
@@ -28,32 +30,18 @@ class UserAccess extends Model {
         return this;
     }
 
-    static getFromUser(userId) {
-        let sql = "SELECT * FROM user_access WHERE user_id  = ? ";
-        return super.get(sql, userId, this, "User do not exists");
+    getFromUser(userId) {
+        return super.getOne(new QueryMap().put('user_id', userId));
     }
 
-    static getFromToken(accessToken) {
-        let sql = "SELECT * FROM user_access WHERE access_token  = ? ";
-        return super.get(sql, accessToken, this, "User do not exists");
-    }
-
-    createInTx(connection) {
-        this._createdAt = new Timestamp().getYMDHMS();
-        this._updatedAt = this._createdAt;
-
-        let sql = 'INSERT INTO user_access SET ? ';
-        return super.createInTx(connection, sql, this);
+    getFromToken(accessToken) {
+        return super.getOne(new QueryMap().put('access_token', accessToken));
     }
 
     update() {
-        this._updatedAt = new Timestamp().getYMDHMS();
+        return Query.transaction(connection => {
 
-        return Query.executeInTx(connection => {
-
-            let sql = 'UPDATE user_access SET ?  WHERE user_id = ?';
-
-            return super.updateInTx(connection, sql, [this.clean(), this._userId])
+            return super.updateInTx(connection, new QueryMap().put('user_id', this._userId))
                 .then(useraccess => {
 
                     let keyStore = new KeyStore(
@@ -71,20 +59,12 @@ class UserAccess extends Model {
     }
 
     static removeKeys(userId, location) {
-        super._updatedAt = new Timestamp().getYMDHMS();
-
         let userAccess = new UserAccess(userId, null, null, location);
-        let sql = 'UPDATE user_access SET ? WHERE user_id = ?';
-
-        return userAccess.remove(sql, [userAccess.clean(), userId]);
+        return userAccess.update(new QueryMap().put('user_id', userId));
     }
 
     updateInTx(connection) {
-        this._updatedAt = new Timestamp().getYMDHMS();
-
-        let sql = 'UPDATE user_access SET ?  WHERE user_id = ?';
-
-        return super.updateInTx(connection, sql, [this.clean(), this._userId])
+        return super.updateInTx(connection ,new QueryMap().put('user_id', this._userId));
     }
 
     get _userId() {
