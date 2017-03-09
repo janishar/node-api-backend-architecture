@@ -27,9 +27,10 @@ const NoSuchEntityExistsError = require('./../helpers/error').NoSuchEntityExists
 
 class Model {
 
-    constructor(id, status, createdAt, updatedAt) {
+    constructor(tableName, id, status, createdAt, updatedAt) {
+        this._tableName = tableName;
         this._id = id;
-        this._status = (status || true);
+        this._status = status;
         this._createdAt = createdAt;
         this._updatedAt = updatedAt;
     }
@@ -43,13 +44,11 @@ class Model {
         return this;
     }
 
-    /**
-     * Call this method to get the query parameter for such queries which don't require null
-     * Most common use case is when update a model and it has id as null.
-     */
-    clean() {
+    getValues() {
         let clone = {};
         Object.assign(clone, this);
+
+        delete clone.tableName;
 
         for (const i in clone) {
             if (typeof clone[i] === 'undefined') {
@@ -60,25 +59,37 @@ class Model {
         return clone;
     }
 
-    create(sql, obj) {
-        return Query.execute(sql, obj.clean())
+    create() {
+        return Query.builder(this._tableName)
+            .insert()
+            .values(this.getValues())
+            .build()
+            .execute()
             .then(result => {
                 return new Promise((resolve, reject) => {
-                    if (result.insertId === undefined) {
+
+                    if (result.insertId === undefined || result.insertId === null) {
                         return reject(new InternalError());
                     }
 
                     this._id = result.insertId;
 
-                    return resolve(obj)
+                    return resolve(this)
                 })
             })
     }
 
-    update(sql, queryvalues) {
-        return Query.execute(sql, queryvalues)
+    update(queryConditionMap) {
+
+        return Query.builder(this._tableName)
+            .update()
+            .values(this.getValues())
+            .whereMap(queryConditionMap)
+            .build()
+            .execute()
             .then(result => {
                 return new Promise((resolve, reject) => {
+
                     if (!(result.affectedRows > 0)) {
                         return reject(new InternalError());
                     }
@@ -88,10 +99,15 @@ class Model {
             })
     }
 
-    remove(sql, queryvalues) {
-        return Query.execute(sql, queryvalues)
+    remove(queryConditionMap) {
+
+        return Query.builder(this._tableName)
+            .whereMap(queryConditionMap)
+            .build()
+            .execute()
             .then(result => {
                 return new Promise((resolve, reject) => {
+
                     if (!(result.affectedRows > 0)) {
                         return reject(new InternalError());
                     }
@@ -101,51 +117,77 @@ class Model {
             })
     }
 
-    createInTx(connection, sql, obj) {
-        debug.log(sql);
-        return connection.queryAsync(sql, obj.clean())
-            .then(result => {
-                return new Promise((resolve, reject) => {
-                    if (result.insertId === undefined) {
-                        return reject(new InternalError());
-                    }
+    createInTx() {
+        return Query.transaction(connection => {
 
-                    this._id = result.insertId;
+            return Query.builder(this._tableName)
+                .insert()
+                .values(this.getValues())
+                .build()
+                .executeInTx(connection)
+                .then(result => {
+                    return new Promise((resolve, reject) => {
 
-                    resolve(obj)
-                });
-            })
-    }
+                        if (result.insertId === undefined) {
+                            return reject(new InternalError());
+                        }
 
-    updateInTx(connection, sql, queryvalues) {
-        return connection.queryAsync(sql, queryvalues)
-            .then(result => {
-                return new Promise((resolve, reject) => {
-                    if (!(result.affectedRows > 0)) {
-                        return reject(new InternalError());
-                    }
+                        this._id = result.insertId;
 
-                    return resolve(this)
+                        resolve(this)
+                    });
                 })
-            })
+        })
     }
 
+    updateInTx(queryConditionMap) {
+        return Query.transaction(connection => {
+            return Query.builder(this._tableName)
+                .update()
+                .whereMap(queryConditionMap)
+                .values(this.getValues())
+                .build()
+                .executeInTx(connection)
+                .then(result => {
+                    return new Promise((resolve, reject) => {
 
-    static get(sql, queryvalues, Class, errMsg) {
-        return Query.execute(sql, queryvalues)
+                        if (!(result.affectedRows > 0)) {
+                            return reject(new InternalError());
+                        }
+
+                        return resolve(this)
+                    })
+                })
+        })
+    }
+
+    getOne(queryConditionMap) {
+
+        return Query.builder(this._tableName)
+            .select()
+            .whereMap(queryConditionMap)
+            .limit(1)
+            .build()
+            .execute()
             .then(results => {
                 return new Promise((resolve, reject) => {
+
                     if (results[0] === undefined) {
-                        return reject(new NoSuchEntityExistsError(errMsg));
+                        return reject(new NoSuchEntityExistsError('No Such Entry'));
                     }
 
-                    return resolve(new Class().copy(results[0]))
+                    return resolve(this.copy(results[0]))
                 })
             })
     }
 
-    static getAll(sql, queryvalues, Class, errMsg) {
-        return Query.execute(sql, queryvalues)
+    getAll(queryConditionMap) {
+
+        return Query.builder(this._tableName)
+            .select()
+            .whereMap(queryConditionMap)
+            .build()
+            .execute()
             .then(results => {
                 return new Promise((resolve, reject) => {
                     if (results[0] === undefined) {
@@ -155,7 +197,7 @@ class Model {
                     let array = [];
 
                     for (let i = 0; i < results.length; i++) {
-                        array.push(new Class().copy(results[i]))
+                        array.push(new this.constructor().copy(results[i]))
                     }
 
                     return resolve(array)
@@ -163,11 +205,42 @@ class Model {
             })
     }
 
-    static batchInsert(sql, values) {
-        debug.log(sql);
-        return Query.executeInTx(connection => {
+    /**
+     *  offset starts from 0 for the api:
+     *  it specifies the rows to fetch after x rows
+     *  count specifies the number of rows to fetch from the offset
+     */
+    getAsPaginated(offset, count, queryConditionMap) {
+
+        return Query.builder(this._tableName)
+            .select()
+            .whereMap(queryConditionMap)
+            .limit(count, offset)
+            .build()
+            .execute()
+            .then(results => {
+                return new Promise((resolve, reject) => {
+                    if (results[0] === undefined) {
+                        return reject(new NoSuchEntityExistsError(errMsg));
+                    }
+
+                    let array = [];
+
+                    for (let i = 0; i < results.length; i++) {
+                        array.push(new this.constructor().copy(results[i]))
+                    }
+
+                    return resolve(array)
+                })
+            })
+    }
+
+    batchInsert(sql, values) {
+        return Query.transaction(connection => {
+
             return connection.queryAsync(sql, values)
                 .then(result => {
+
                     return new Promise((resolve, reject) => {
                         if (!(result.affectedRows > 0)) {
                             return reject(new InternalError());
@@ -175,8 +248,16 @@ class Model {
 
                         return resolve(true)
                     })
-                }).catch(err => {debug.logAsJSON(err); throw err})
+                })
         });
+    }
+
+    get _tableName() {
+        return this.tableName
+    }
+
+    set _tableName(tableName) {
+        this.tableName = tableName;
     }
 
     get _id() {

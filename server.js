@@ -22,7 +22,6 @@
  * Module dependencies.
  */
 const express = require('express');
-const vhost = require('vhost');
 const mysql = require("mysql");
 const config = require('./config.json');
 const bodyParser = require('body-parser');
@@ -39,30 +38,14 @@ app.use(bodyParser.json());
 app.use(bodyParser.urlencoded({ extended: true }));
 app.use(expressValidator());
 
-// https://rainsoft.io/when-not-to-use-arrow-functions-in-javascript/
-// use promise reject in a callback based functions or in a wrapper promise function else use throw
-
-if (app.get('env') === 'production') {
-    global.DB_POOL = mysql.createPool({
-        host: config.production.database.host,
-        user: config.production.database.user,
-        password: config.production.database.pwd,
-        database: config.production.database.db,
-        connectionLimit: 25,
-        supportBigNumbers: true
-    });
-}
-else {
-    console.log('mysql local server');
-    global.DB_POOL = mysql.createPool({
-        host: config.development.database.host,
-        user: config.development.database.user,
-        password: config.development.database.pwd,
-        database: config.development.database.db,
-        connectionLimit: 5,
-        supportBigNumbers: true
-    });
-}
+global.DB_POOL = mysql.createPool({
+    host: config.database.host,
+    user: config.database.user,
+    password: config.database.pwd,
+    database: config.database.db,
+    connectionLimit: 25,
+    supportBigNumbers: true
+});
 
 app.set('port', process.env.PORT || config.port);
 app.use(require('./routes.js'));

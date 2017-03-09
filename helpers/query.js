@@ -19,8 +19,6 @@
 'use strict';
 
 const Promise = require('bluebird');
-const debug = new (require('./debug'))();
-
 let InternalError = require('./error').InternalError;
 
 Promise.promisifyAll(require("mysql/lib/Connection").prototype);
@@ -28,20 +26,38 @@ Promise.promisifyAll(require("mysql/lib/Pool").prototype);
 
 class Query {
 
-    static getSqlConnection() {
-        return dbPool.getConnectionAsync().disposer(connection => connection.release());
+    constructor(queryString, queryData) {
+        this._queryString = queryString;
+        this._queryData = queryData;
     }
 
-    static execute(sql, tableData) {
+    get _queryString() {
+        return this.queryString;
+    }
+
+    set _queryString(queryString) {
+        this.queryString = queryString;
+    }
+
+    get _queryData() {
+        return this.queryData;
+    }
+
+    set _queryData(queryData) {
+        this.queryData = queryData;
+    }
+
+    static getSqlConnection() {
+        return DB_POOL.getConnectionAsync().disposer(connection => connection.release());
+    }
+
+    execute() {
 
         return Promise.using(Query.getSqlConnection(), connection => {
 
-            debug.log(sql);
-
-            return connection.queryAsync(sql, tableData)
+            return connection.queryAsync(this._queryString, this._queryData)
                 .catch(e => {
-
-                    debug.log("query err : " + e);
+                    debug.logAsJSON(e);
 
                     fileLog.logError(e);
 
@@ -50,9 +66,20 @@ class Query {
         });
     };
 
-    static executeInTx(fn) {
+    executeInTx(connection) {
+        return connection.queryAsync(this._queryString, this._queryData)
+            .catch(e => {
+                debug.log("query err : " + e);
 
-        return Promise.using(dbPool.getConnectionAsync(), connection => {
+                fileLog.logError(e);
+
+                throw new InternalError("Database Error");
+            })
+    };
+
+    static transaction(fn) {
+
+        return Promise.using(DB_POOL.getConnectionAsync(), connection => {
 
             var tx = connection.beginTransactionAsync();
 
@@ -72,26 +99,146 @@ class Query {
         });
     };
 
-    static getPlaceholdersForConditionIN(valArray) {
+    static builder(tableName) {
+        return new QueryBuilder(tableName);
+    }
+}
 
-        var sql = "(";
+class QueryBuilder {
 
-        for (var i = 0; i < valArray.length; i++) {
-            switch (i) {
-                case 0:
-                    sql += "?";
-                    break;
-                case valArray.length - 1:
-                    sql += ",?";
-                    break;
-                default:
-                    sql += ",?";
+    constructor(tableName) {
+        this._tableName = tableName;
+        this._queryString = '';
+        this._queryData = [];
+    }
+
+    get _tableName() {
+        return this.tableName;
+    }
+
+    set _tableName(tableName) {
+        this.tableName = tableName;
+    }
+
+    get _queryString() {
+        return this.queryString;
+    }
+
+    set _queryString(queryString) {
+        this.queryString = queryString;
+    }
+
+    get _queryData() {
+        return this.queryData;
+    }
+
+    set _queryData(queryData) {
+        this.queryData = queryData;
+    }
+
+    select(columnNameArray) {
+
+        this._queryString = 'SELECT ';
+
+        if (columnNameArray === undefined || columnNameArray === null || !columnNameArray.isArray) {
+            this._queryString += '* ';
+        }
+        else {
+
+            for (let i = 0; i < columnNameArray.length; i++) {
+
+                this._queryString += columnNameArray[i];
+
+                if (i < columnNameArray.length - 1) {
+                    this._queryString += ', ';
+                }
             }
         }
 
-        sql += ")";
-        return sql;
-    };
+        this._queryString += 'FROM ' + this._tableName + ' ';
+        return this;
+    }
+
+    insert() {
+        this._queryString = 'INSERT INTO ' + this._tableName + ' SET ? ';
+        return this;
+    }
+
+    update() {
+        this._queryString = 'UPDATE ' + this._tableName + ' SET ? ';
+        return this;
+    }
+
+    remove() {
+        this._queryString = 'DELETE FROM ' + this._tableName + ' ';
+        return this;
+    }
+
+    where(columnName, value) {
+
+        this._queryString += 'WHERE ';
+        this._queryString += columnName + ' = ? ';
+        this.values(value);
+        return this
+    }
+
+    whereMap(map) {
+        if (map !== undefined && map !== null) {
+            for (var [key, value] of map.entries()) {
+                this.where(key, value);
+            }
+        }
+        return this
+    }
+
+    and(columnName, value) {
+
+        this._queryString += 'AND ';
+        this._queryString += columnName + ' = ? ';
+        this.values(value);
+        return this
+    }
+
+    or(columnName, value) {
+
+        this._queryString += 'OR ';
+        this._queryString += columnName + ' = ? ';
+        this.values(value);
+        return this
+    }
+
+    descending(columnName) {
+        this._queryString += 'ORDER BY ' + columnName + ' DESC ';
+        return this
+    }
+
+    ascending(columnName) {
+        this._queryString += 'ORDER BY ' + columnName + ' ASC ';
+        return this
+    }
+
+    limit(count, offset) {
+
+        this._queryString += 'LIMIT ';
+
+        if (offset !== undefined && offset !== null) {
+            this._queryString += offset + ',';
+        }
+
+        this._queryString += count + ' ';
+        return this
+    }
+
+    values(queryData) {
+        this._queryData.push(queryData);
+        return this;
+    }
+
+    build() {
+        debug.logAsJSON(this);
+        return new Query(this._queryString, this._queryData);
+    }
 }
 
 module.exports = Query;
+module.exports.QueryBuilder = QueryBuilder;

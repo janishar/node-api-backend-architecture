@@ -1,27 +1,14 @@
-/*
- * Copyright (C) 2017 MINDORKS NEXTGEN PRIVATE LIMITED
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://mindorks.com/license/apache-v2
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License
- */
-
 /**
- * Created by janisharali on 07/03/17.
+ * Created by janisharali on 06/03/16.
  */
-'use strict';
 const Query = require('./../helpers/query');
 const Promise = require('bluebird');
 const Model = require('./model');
 const UserAccess = require('./user_access');
+const KeyStore = require('./key_store');
 const Timestamp = require('./../helpers/timestamp');
+
+const debug = new (require('../helpers/debug'))();
 
 class User extends Model {
 
@@ -88,6 +75,14 @@ class User extends Model {
                     return userAccess.createInTx(connection)
                 })
                 .then(useraccess => {
+                    let keyStore = new KeyStore(
+                        useraccess._userId,
+                        useraccess._accessToken,
+                        useraccess._refreshToken
+                    );
+                    return keyStore.createInTx(connection)
+                })
+                .then(keystore => {
                     return Promise.resolve(this);
                 })
         });
@@ -106,6 +101,14 @@ class User extends Model {
                     return userAccess.updateInTx(connection)
                 })
                 .then(useraccess => {
+                    let keyStore = new KeyStore(
+                        useraccess._userId,
+                        useraccess._accessToken,
+                        useraccess._refreshToken
+                    );
+                    return keyStore.createInTx(connection)
+                })
+                .then(keystore => {
                     return Promise.resolve(this);
                 })
         })

@@ -37,7 +37,7 @@ app.use('/v1', (req, res, next) => {
  * these apis should not be logged
  * These are public APIs protected by api_key
  */
-app.use('/v1', require('./../../middlewares/public_auth'));
+//app.use('/v1', require('./../../middlewares/public_auth'));
 //app.use('/v1/login', require('./login'));
 //--------------------------------------------------------------------------------------------
 /**
@@ -49,8 +49,8 @@ app.use('/v1', (req, res, next) => {
     fileLog.logRequest(req);
     next();
 });
-app.use('/v1', require('./../../middlewares/private_auth'));
-//app.use('/v1/blogs', require('./blogs'));
+//app.use('/v1', require('./../../middlewares/private_auth'));
+app.use('/v1/feedback', require('./feedback'));
 //..............................................................................................
 //**********************************************************************************************
 

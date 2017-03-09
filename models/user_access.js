@@ -1,22 +1,6 @@
-/*
- * Copyright (C) 2017 MINDORKS NEXTGEN PRIVATE LIMITED
- * Licensed under the Apache License, Version 2.0 (the "License");
- * you may not use this file except in compliance with the License.
- * You may obtain a copy of the License at
- *
- *     https://mindorks.com/license/apache-v2
- *
- * Unless required by applicable law or agreed to in writing, software
- * distributed under the License is distributed on an "AS IS" BASIS,
- * WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
- * See the License for the specific language governing permissions and
- * limitations under the License
- */
-
 /**
- * Created by janisharali on 07/03/17.
+ * Created by janisharali on 06/03/16.
  */
-'use strict';
 const Query = require('./../helpers/query');
 const Promise = require('bluebird');
 const Model = require('./model');
@@ -24,18 +8,22 @@ const Timestamp = require('./../helpers/timestamp');
 
 class UserAccess extends Model {
 
-    constructor(userId, accessTokenKey) {
+    constructor(userId, accessToken, refreshToken, location) {
         super();
         this._userId = userId;
-        this._accessTokenKey = accessTokenKey;
+        this._accessToken = accessToken;
+        this._refreshToken = refreshToken;
+        this._location = location;
     }
 
-    copy({id, user_id, access_token_key, status, updated_at, created_at}) {
+    copy({id, user_id, access_token, refresh_token, last_logged_location, status, updated_at, created_at}) {
 
         super.copy({id, status, created_at, updated_at});
 
         this._userId = user_id;
-        this._accessTokenKey = access_token_key;
+        this._accessToken = access_token;
+        this._refreshToken = refresh_token;
+        this._location = last_logged_location;
 
         return this;
     }
@@ -45,9 +33,9 @@ class UserAccess extends Model {
         return super.get(sql, userId, this, "User do not exists");
     }
 
-    static getFromToken(accessTokenKey) {
+    static getFromToken(accessToken) {
         let sql = "SELECT * FROM user_access WHERE access_token  = ? ";
-        return super.get(sql, accessTokenKey, this, "User do not exists");
+        return super.get(sql, accessToken, this, "User do not exists");
     }
 
     createInTx(connection) {
@@ -62,16 +50,30 @@ class UserAccess extends Model {
         this._updatedAt = new Timestamp().getYMDHMS();
 
         return Query.executeInTx(connection => {
+
             let sql = 'UPDATE user_access SET ?  WHERE user_id = ?';
 
             return super.updateInTx(connection, sql, [this.clean(), this._userId])
+                .then(useraccess => {
+
+                    let keyStore = new KeyStore(
+                        this._userId,
+                        this._accessToken,
+                        this._refreshToken
+                    );
+
+                    return keyStore.createInTx(connection)
+                })
+                .then(keystore => {
+                    return Promise.resolve(this)
+                })
         });
     }
 
-    static removeKey(userId) {
+    static removeKeys(userId, location) {
         super._updatedAt = new Timestamp().getYMDHMS();
 
-        let userAccess = new UserAccess(userId, null);
+        let userAccess = new UserAccess(userId, null, null, location);
         let sql = 'UPDATE user_access SET ? WHERE user_id = ?';
 
         return userAccess.remove(sql, [userAccess.clean(), userId]);
@@ -93,12 +95,28 @@ class UserAccess extends Model {
         return this.user_id = userId;
     }
 
-    get _accessTokenKey() {
-        return this.access_token_key;
+    get _accessToken() {
+        return this.access_token;
     }
 
-    set _accessTokenKey(accessTokenKey) {
-        return this.access_token_key = accessTokenKey;
+    set _accessToken(accessToken) {
+        return this.access_token = accessToken;
+    }
+
+    get _refreshToken() {
+        return this.refresh_token;
+    }
+
+    set _refreshToken(refreshToken) {
+        return this.refresh_token = refreshToken;
+    }
+
+    get _location() {
+        return this.last_logged_location;
+    }
+
+    set _location(location) {
+        return this.last_logged_location = location;
     }
 }
 

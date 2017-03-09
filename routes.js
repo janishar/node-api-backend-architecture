@@ -38,7 +38,6 @@ if (app.get('env') === 'production') {
     global.debug = new (require('./helpers/debug'))(true);
 }
 
-global.debug = debug;
 global.fileLog = fileLog;
 
 app.use(require('./controllers/v1'));
