@@ -21,7 +21,7 @@
 const Promise = require('bluebird');
 const Query = require('./../helpers/query');
 const Timestamp = require('./../helpers/timestamp');
-
+const QueryMap = require('./../helpers/query').QueryMap;
 const InternalError = require('./../helpers/error').InternalError;
 const NoSuchEntityExistsError = require('./../helpers/error').NoSuchEntityExistsError;
 
@@ -89,6 +89,11 @@ class Model {
             })
     }
 
+    updateById(){
+        this._updatedAt = new Timestamp().getYMDHMS();
+        return this.update(new QueryMap().put('id', this._id))
+    }
+
     remove(whereAndQueryMap) {
         return Query.builder(this._tableName)
             .remove()
@@ -96,8 +101,12 @@ class Model {
             .build()
             .execute()
             .then(result => {
-                return this.parseRemoveResult();
+                return this.parseRemoveResult(result);
             })
+    }
+
+    removeById(){
+        return this.remove(new QueryMap().put('id', this._id))
     }
 
     createInTx(connection) {
@@ -149,6 +158,10 @@ class Model {
             })
     }
 
+    getById(id){
+        return this.getOne(new QueryMap().put('id', id), this)
+    }
+
     getAll(whereAndQueryMap) {
 
         return Query.builder(this._tableName)
@@ -161,12 +174,16 @@ class Model {
             })
     }
 
+    getAsPage(offset, count) {
+        return super.getPaginated(offset, count, new QueryMap().put('status', 1));
+    }
+
     /**
      *  offset starts from 0 for the api:
      *  it specifies the rows to fetch after x rows
      *  count specifies the number of rows to fetch from the offset
      */
-    getAsPaginated(offset, count, whereAndQueryMap) {
+    getPaginated(offset, count, whereAndQueryMap) {
 
         return Query.builder(this._tableName)
             .select()
@@ -203,7 +220,7 @@ class Model {
         })
     }
 
-    parseRemoveResult(){
+    parseRemoveResult(result){
         return new Promise((resolve, reject) => {
 
             if (!(result.affectedRows > 0)) {

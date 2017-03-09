@@ -131,6 +131,11 @@ class QueryBuilder {
         this.queryData = queryData;
     }
 
+    rawSQL(queryString) {
+        this._queryString = queryString;
+        return this;
+    }
+
     select(queryMap) {
 
         this._queryString = 'SELECT ';
@@ -181,6 +186,49 @@ class QueryBuilder {
 
         this._queryString += 'WHERE ';
         this._queryString += columnName + ' = ? ';
+        this.values(value);
+        return this
+    }
+
+    whereCompare(columnName) {
+
+        this._queryString += 'WHERE ';
+        this._queryString += columnName + ' ';
+        return this
+    }
+
+    equal(value) {
+        this._queryString += '= ? ';
+        this.values(value);
+        return this
+    }
+
+    greater(value) {
+        this._queryString += '> ? ';
+        this.values(value);
+        return this
+    }
+
+    lesser(value) {
+        this._queryString += '< ? ';
+        this.values(value);
+        return this
+    }
+
+    equalOrGreater(value) {
+        this._queryString += '>= ? ';
+        this.values(value);
+        return this
+    }
+
+    equalOrLesser(value) {
+        this._queryString += '=< ? ';
+        this.values(value);
+        return this
+    }
+
+    notEqual(value) {
+        this._queryString += '>< ? ';
         this.values(value);
         return this
     }
@@ -240,16 +288,30 @@ class QueryBuilder {
     and(columnName, value) {
 
         this._queryString += 'AND ';
-        this._queryString += columnName + ' = ? ';
+        this._queryString += columnName + '= ? ';
         this.values(value);
+        return this
+    }
+
+    andCompare(columnName) {
+
+        this._queryString += 'AND ';
+        this._queryString += columnName + ' ';
         return this
     }
 
     or(columnName, value) {
 
         this._queryString += 'OR ';
-        this._queryString += columnName + ' = ? ';
+        this._queryString += columnName + '= ? ';
         this.values(value);
+        return this
+    }
+
+    orCompare(columnName) {
+
+        this._queryString += 'OR ';
+        this._queryString += columnName + ' ';
         return this
     }
 
@@ -286,54 +348,54 @@ class QueryBuilder {
     }
 }
 
-class QueryMap{
+class QueryMap {
 
-    constructor(){
+    constructor() {
         this.map = new Map();
     }
 
-    get _map(){
+    get _map() {
         return this.map;
     }
 
-    set _map(map){
+    set _map(map) {
         return this.map = map;
     }
 
-    put(key, value){
+    put(key, value) {
         this.map.set(key, value);
         return this;
     }
 
-    get(key){
+    get(key) {
         return this._map.get(key);
     }
 
-    contains(key){
+    contains(key) {
         return this._map.has(key);
     }
 
-    remove(key){
+    remove(key) {
         return this._map.delete(key);
     }
 
-    clear(){
+    clear() {
         return this._map.clear();
     }
 
-    values(){
+    values() {
         return this._map.values();
     }
 
-    keys(){
+    keys() {
         return this._map.keys();
     }
 
-    size(){
+    size() {
         return this._map.size();
     }
 
-    entries(){
+    entries() {
         return this._map.entries();
     }
 }

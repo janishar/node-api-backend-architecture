@@ -67,11 +67,6 @@ router.get('/all',
         return new Feedback().getAll()
             .then(feedbackList => {
 
-                let data = [];
-                feedbackList.forEach( feedback => {
-                    data.push(feedback.getValues());
-                });
-
                 return Promise.map(feedbackList, feedback => {
                     return feedback.getValues();
                 });
