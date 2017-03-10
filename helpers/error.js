@@ -21,9 +21,19 @@
 const Response = require('./response');
 
 class CustomError extends Error {
-    constructor(message) {
+
+    constructor(name, message) {
         super();
+        this._name = name;
         this._message = message;
+    }
+
+    set _name(name) {
+        this.name = name;
+    }
+
+    get _name() {
+        return this.name;
     }
 
     set _message(message) {
@@ -35,30 +45,31 @@ class CustomError extends Error {
     }
 
     static handle(err, res) {
-        switch (typeof err) {
 
-            case NoSuchUserExistsError:
-            case AuthFailureError:
+        switch (err.name) {
+
+            case "NoSuchUserExistsError":
+            case "AuthFailureError":
                 return new Response.AuthFailureResponse(err._message).send(res);
 
-            case AccessTokenError:
+            case "AccessTokenError":
                 return new Response.AccessTokenErrorResponse(err._message).send(res);
 
-            case InternalError:
+            case "InternalError":
                 return new Response.InternalErrorResponse(err._message).send(res);
 
-            case NotFoundError:
+            case "NotFoundError":
                 err._url = res.req.originalUrl;
                 return new Response.NotFoundResponse(err._message).send(res);
 
-            case NoSuchEntityExistsError:
-            case BadRequestError:
+            case "NoSuchEntityExistsError":
+            case "BadRequestError":
                 return new Response.BadRequestResponse(err._message).send(res);
 
-            case ForbiddenError:
+            case "ForbiddenError":
                 return new Response.ForbiddenResponse(err._message).send(res);
 
-            case AdminError:
+            case "AdminError":
                 return new Response.AdminErrorResponse(err._message, err._status).send(res);
         }
         // getter is not used to access the variable because there can be not defined error being thrown
@@ -68,31 +79,31 @@ class CustomError extends Error {
 
 class AccessTokenError extends CustomError {
     constructor(message) {
-        super((message || 'Invalid access token'))
+        super("AccessTokenError", (message || 'Invalid access token'))
     }
 }
 
 class AuthFailureError extends CustomError {
     constructor(message) {
-        super((message || 'Invalid Credentials'))
+        super("AuthFailureError", (message || 'Invalid Credentials'))
     }
 }
 
 class InternalError extends CustomError {
     constructor(message) {
-        super((message || "Internal error"))
+        super("InternalError", (message || "Internal error"))
     }
 }
 
 class BadRequestError extends CustomError {
     constructor(message) {
-        super((message || 'Bad Request'))
+        super("BadRequestError", (message || 'Bad Request'))
     }
 }
 
 class NotFoundError extends CustomError {
     constructor(message, url) {
-        super((message || 'Not Found'));
+        super("NotFoundError", (message || 'Not Found'));
         this._url = url;
     }
 
@@ -107,31 +118,31 @@ class NotFoundError extends CustomError {
 
 class ForbiddenError extends CustomError {
     constructor(message) {
-        super((message || 'Permission denied'))
+        super("ForbiddenError", (message || 'Permission denied'))
     }
 }
 
 class NoSuchUserExistsError extends CustomError {
     constructor(message) {
-        super((message || "User don't exists"))
+        super("NoSuchUserExistsError", (message || "User don't exists"))
     }
 }
 
 class NoSuchEntityExistsError extends CustomError {
     constructor(message) {
-        super((message || 'No such entry'))
+        super("NoSuchEntityExistsError", (message || 'No such entry'))
     }
 }
 
 class InvalidJwtTokenError extends CustomError {
     constructor(message) {
-        super((message || 'Invalid token'))
+        super("InvalidJwtTokenError", (message || 'Invalid token'))
     }
 }
 
 class AdminError extends CustomError {
     constructor(message, status) {
-        super(message);
+        super("AdminError", message);
         this._status = status;
     }
 
